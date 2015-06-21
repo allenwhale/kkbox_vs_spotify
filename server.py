@@ -10,6 +10,8 @@ from urllib import parse
 import base64
 from spotify import SpotifyHandler
 from kkbox import KKBOXHandler
+from threading import Thread
+import time
 
 CLIENT_ID = '70e5f69180f3425c9959eee856311097'
 CLIENT_SECRET = '7fdad82fe5a8437a962561a0c09236ed'
@@ -38,7 +40,7 @@ class CallbackHandler(RequestHandler):
         global KEY
         KEY = json.loads(r.text)
         print('key', KEY)
-        shutdown()
+        update()
         return
 
     @reqenv
@@ -50,20 +52,27 @@ def shutdown():
     srv.stop()
     tornado.ioloop.IOLoop.instance().stop()
 
-URLS = ['http://www.kkbox.com/tw/tc/charts/overall_newrelease-daily-song-latest.html']
-PLAYLIST = ['78g9F2Sv2LVp6lGjbl4ydD']
+def _start():
+    print('prepare')
+    time.sleep(5)
+    print('start')
+    r = requests.get('http://localhost:12345', allow_redirects=True)
+    print(r.status_code, r.text)
+    print('end')
 
-if __name__ == '__main__':
-    app = tornado.web.Application([
-        ('/', IndexHandler),
-        ('/callback', CallbackHandler),
-        ('/callback/', CallbackHandler),
-        ('/(.*)', tornado.web.StaticFileHandler, {'path': '../html'}),
-        ])
-    global srv
-    srv = tornado.httpserver.HTTPServer(app)
-    srv.listen(12345)
-    tornado.ioloop.IOLoop().instance().start()
+URLS = ['http://www.kkbox.com/tw/tc/charts/overall_newrelease-daily-song-latest.html',
+        'http://www.kkbox.com/tw/tc/charts/chinese-daily-song-latest.html',
+        'http://www.kkbox.com/tw/tc/charts/chinese-newrelease_daily-song-latest.html',
+        'http://www.kkbox.com/tw/tc/charts/western-daily-song-latest.html',
+        'http://www.kkbox.com/tw/tc/charts/western-newrelease_daily-song-latest.html'
+        ]
+PLAYLIST = ['7fjEesue7CYHiJaPhbCLEf',
+        '3LbXl2SK6mc4MuULUXfI8p',
+        '5ohKlAhooYvbuTlEwHasfF',
+        '4uEcAXBFgch5n4r1WCHjjC',
+        '2cb8oJBjC03StlDXFJcbs3']
+
+def update():
     print(KEY)
     s = SpotifyHandler(CLIENT_ID, CLIENT_SECRET, USERNAME, KEY)
     for url, playlist in zip(URLS, PLAYLIST):
@@ -76,3 +85,17 @@ if __name__ == '__main__':
             res = s.search(song['song']+' '+song['songer'])
             if res:
                 p.add_tracks([res['uri']])
+
+
+if __name__ == '__main__':
+#    Thread(target=_start).start()
+    print('app')
+    app = tornado.web.Application([
+        ('/', IndexHandler),
+        ('/callback', CallbackHandler),
+        ('/callback/', CallbackHandler),
+        ])
+    global srv
+    srv = tornado.httpserver.HTTPServer(app)
+    srv.listen(12345)
+    tornado.ioloop.IOLoop().instance().start()
